@@ -2,7 +2,7 @@
 
 _Note: the resulting combined dataset can be found at **Ballsystem_LegKinematics_DataStructures\P9_BPN\generate_dataset**_
 
-**1. generatedataset.ipynb**: generates combined dataset with P9 and BPN data
+**1. generatedataset.ipynb**: original code to generate combined dataset with P9 and BPN data
 
 **2. generatedataset_updated.ipynb**: generates combined dataset with P9 and BPN data -- includes fly trajectories and fixed step cycle prediction
 
