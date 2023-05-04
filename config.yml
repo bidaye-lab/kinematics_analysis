@@ -1,0 +1,7 @@
+datafile: \\mpfi.org\public\sb-lab\Ballsystem_LegKinematics_DataStructures\P9_BPN\generate_dataset\alldata_V5.h5
+BPN_ball:  \\mpfi.org\public\sb-lab\Ballsystem_LegKinematics_DataStructures\P9_BPN\BPN_V6_BallCenter.csv
+P9RT_ball: \\mpfi.org\public\sb-lab\Ballsystem_LegKinematics_DataStructures\P9_BPN\P9RT_V6_BallCenter.csv
+P9LT_ball: \\mpfi.org\public\sb-lab\Ballsystem_LegKinematics_DataStructures\P9_BPN\P9LT_V6_BallCenter.csv
+
+plot_folder: ./plots/
+data_folder: ./data/
