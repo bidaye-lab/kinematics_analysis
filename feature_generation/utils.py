@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from scipy.optimize import minimize
 
 import matplotlib.pylab as plt
 import seaborn as sns
@@ -197,38 +198,326 @@ def filter_frames(df, f_0=400, f_f=1000, f_trl=1400):
 
     return df_filt
 
+###########
+## fit ball
+
+def get_xyz_mean(df, point):
+    '''Calculate the mean xyz coordinate for a given point
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Coordinate data frame, must contain the x, y, and z columns for `point`
+    point : str
+        Used to identify uniquely a subset of columns.
+        E.g. 'TaG' will average over all columns containing 'TaG_x', 'TaG_y', and 'TaG_z'
+
+    Returns
+    -------
+    xyz : np.array
+        3x1 numpy array with mean x, y, and z coordinates
+    '''
+
+    # construct xyz str based on point
+    point_x, point_y, point_z = [ '{}_{}'.format(point, i) for i in 'xyz' ]
+
+    # select xyz columns
+    cols_x = [ c for c in df.columns if point_x in c ]
+    cols_y = [ c for c in df.columns if point_y in c ]
+    cols_z = [ c for c in df.columns if point_z in c ]
+
+    # calculate mean
+    x = df.loc[ :, cols_x ].values.mean()
+    y = df.loc[ :, cols_y ].values.mean()
+    z = df.loc[ :, cols_z ].values.mean()
+    xyz = np.array([x, y, z])
+
+    return xyz
+
+def get_ball0(df, d=4.5):
+    '''Generate initial guess based on average postitions of TaG and Notum.
+    Calculates vector connecting average Notum with average TaG positions
+    and sets lengs of vector equal to `d`
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Coordinate data containing TaG and Notum positions
+    d : float, optional
+        length of Notum-TaG vector, by default 4.5
+
+    Returns
+    -------
+    ball0 : np.array
+        xyz positions of inital guess
+    '''
+
+
+    # mean of TaG and Notum posititons
+    tag = get_xyz_mean(df, 'TaG')
+    notum =  get_xyz_mean(df, 'Notum')
+
+    # vector connecting means of Notum-TaG
+    notum_tag = norm_vec(tag - notum)
+
+    # initial guess 
+    ball0 = notum + notum_tag * d
+
+    return ball0
+
+
+def cost_fun(x, l_pnts, l_perc):
+    '''Calculate cost for distance of points from surface of sphere
+    For a given list of `pnts` only select points in the percentile
+    interval given in `l_perc`, then calculate the square of the distance
+    from surface of sphere with center x=x[0], y=x[1], z=x[2] and radius x[3]
+
+    Parameters
+    ----------
+    x : np.array
+        4x1 array: x, y, z (center of sphere), and r (radius)
+    l_pnts : list of np.arrays
+        Each element is a Nx3 np array with xyz points
+    l_perc : list of tuples
+        List of percentile ranges pnts, same length as `l_pnts`
+        e.g. (25, 75) selects points with radius between 25 and 75 percentile
+
+    Returns
+    -------
+    cost : float
+        Cost calculated as sum of squared distances from sphere surface
+    '''
+
+    # split input in ball center and ball radius
+    ballc = x[:3]
+    ballr = x[3]
+    
+    cost = 0
+    for pnts, perc in zip(l_pnts, l_perc):
+        # distance of all points from ball center
+        r = np.linalg.norm(pnts - ballc, axis=1)
+
+        # select points based on percentile
+        a, b = np.nanpercentile(r, perc)
+        r = r[ ( r > a ) & ( r < b )]
+
+        # calculate cost (least squares)
+        cost += np.sum((r - ballr)**2)
+
+    return cost
+
+
+
+def fit_ball(df, xyz0, r0, d_perc):
+    '''Fit sphere based on TaG coordinates, the initial guess for the ball
+    coordinates and percentiles for each leg indicating the points used for fitting
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Data frame with TaG xyz coordinates to be used for fitting
+    xyz0 : np.array 3x1
+        initial guess for ball center
+    r0 : float
+        initial guess for ball radius
+    d_perc : dict
+        Dict of tuples, maps leg names to percentile used for each leg
+        e.g. 'R-F': (25, 75)
+
+    Returns
+    -------
+    ball : np.array 3x1
+        fitted xyz coordinates of ball center
+    r : float
+        fitted radius of ball
+    '''
+    
+    # TaG points
+    cols_x = [ c for c in df.columns if 'TaG_x' in c ]
+    l_pnts, l_perc = [], []
+    for c_x in cols_x:
+        cs = [ c_x[:-1] + i for i in 'xyz' ]
+        l_pnts.append(df.loc[:, cs].values)
+        l_perc.append(d_perc[c_x[:3]])
+
+    # initial guess
+    x0 = np.array([*xyz0, r0])
+
+    # optimize cost function
+    res = minimize(cost_fun, x0, args=(l_pnts, l_perc), method='Nelder-Mead')
+    ball, r = res.x[:3], res.x[3]
+
+    return ball, r
+
+def add_distance(df, ball):
+    '''Add columns of distances from ball center for each xyz column triplet
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Data frame with xyz coordinates
+    ball : np.array 3x1
+        xyz coordinates of the ball
+
+    Returns
+    -------
+    df : pd.DataFrame
+        Data frame with distance columns added
+    '''
+
+    df = df.copy()
+
+    # select all columns ending with x, y or z
+
+    # cycle through all columns ending with `_x``
+    cols_x = [c for c in df.columns if c[-2:] == '_x' ]
+    for c_x in cols_x:
+
+        # corresponding `_y` and `_z` columns
+        c_y, c_z = '{}y'.format(c_x[:-1]), '{}z'.format(c_x[:-1])
+
+        # calculate distance
+        coords = df.loc[:, [c_x, c_y, c_z]].values
+        dist = np.linalg.norm(coords - ball, axis=1)
+
+        # write to df 
+        r = '{}_r'.format(c_x[:-2])
+        df.loc[:, r] = dist
+    
+    return df
+
+#############
+## Stepcycles
+def get_r_median(df, d_perc):
+    '''Calculate "median" of TaG positions for each leg
+    The "median" is the mean of the values within the percentile interval 
+    defined in `d_perc`
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Data frame containing TaG_r columns
+    d_perc : dict
+        Percentile range in which to calculate the mean for each leg.
+        e.g. 'R-M': (25, 75)
+
+    Returns
+    -------
+    d_med : dict
+        Mapping from leg to "Median", e.g. 'R-M': 2.98
+    '''
+
+    d_med = dict()
+
+    # cycle through legs
+    cols =  [ c for c in df.columns if 'TaG_r' in c ]
+    for c in cols:
+
+        perc = d_perc[c[:3]]
+
+        # get "median" of r for given leg
+        r = df.loc[:, c]
+        a, b = np.nanpercentile(r, perc)
+        r_m = r[(r>a) & (r<b)].mean()
+
+        # fill dict
+        leg = '-'.join(c.split('-')[:2])
+        d_med[leg] = r_m
+
+    return d_med
+
+def add_stepcycle_pred(df, r_med, delta_r, min_on, min_off):
+    '''Add columns with stepcycle predictions based on the TaG_r columns
+    and multiple thresholds as explained below
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Data frame to which to add columns. Must contain TaG_r columns
+    r_med : dict
+        Mapping between leg and surface distance for that leg, e.g. 'R-M': 2.98
+    delta_r : float
+        distance above r_med to be considered on the ball
+    min_on : int
+        ignore on steps if frames less than min_on
+    min_off : int
+        ignore off steps if frames less than min_off
+
+    Returns
+    -------
+    df : pd.DataFrame
+        Data frames with stepcylce columns added
+    '''
+
+    df = df.copy()
+
+    # cycle through legs
+    cols =  [ c for c in df.columns if 'TaG_r' in c ]
+    for c in cols:
+        
+        leg = '-'.join(c.split('-')[:2])
+
+        # distances from center of ball
+        r = df.loc[:, c]
+        
+        # on frames based on distance criterium
+        on = r < (r_med[leg] + delta_r)
+
+        # require min length of on and off series
+        on_split = np.split(on, np.flatnonzero(np.diff(on))+1)
+        for s in on_split:
+            if s.sum() and (len(s) <= min_on):
+                on.loc[s.index] = False
+            elif not s.sum() and (len(s) <= min_off):
+                on.loc[s.index] = True
+
+        # add column to df
+        df.loc[:, '{}_stepcycle'.format(leg)] = on
+    
+    return df
 
 ######################
 ## Coordinate handling
 
-def add_distance(data, ball_centers):
-    '''Calculate distance from center of the ball
+# TODO: remove this
+# def add_distance(data, ball_centers):
+#     '''Calculate distance from center of the ball
     
-    For all coordinates, i.e. columns in df ending with '_x', '_y', '_z', 
-    calculate the distance from `ball_center`.
-    Adds column ending with '_r' for each xyz triplet.
-    Assumes that '_x', '_y', '_z' columns always appear in this order.
+#     For all coordinates, i.e. columns in df ending with '_x', '_y', '_z', 
+#     calculate the distance from `ball_center`.
+#     Adds column ending with '_r' for each xyz triplet.
+#     Assumes that '_x', '_y', '_z' columns always appear in this order.
 
-    Parameters
-    ----------
-    data : dict
-        Dict with dataframes with raw data, must constain triplets of '_x', '_y', '_z' columns
-    ball_centers : dict
-        dict with x, y, and z coordinate of the ball center, same keys as data
-    '''
+#     Parameters
+#     ----------
+#     data : dict
+#         Dict with dataframes with raw data, must constain triplets of '_x', '_y', '_z' columns
+#     ball_centers : dict
+#         dict with x, y, and z coordinate of the ball center, same keys as data
+#     '''
 
-    for k in ball_centers.keys():
-        print('INFO: Adding distance columns for {}'.format(k))
-        df = data[k]
-        c = ball_centers[k]
+#     for k in ball_centers.keys():
+#         print('INFO: Adding distance columns for {}'.format(k))
+#         df = data[k]
+#         c = ball_centers[k]
 
-        cols = [ c for c in df.columns if c[-2:] in [ '_x', '_y', '_z' ] ]
+#         cols = [ c for c in df.columns if c[-2:] in [ '_x', '_y', '_z' ] ]
 
-        for x, y, z in zip(cols[::3], cols[1::3], cols[2::3]):
-            coords_aligned = df.loc[:, [x, y, z]].values - c
-            dist = np.linalg.norm(coords_aligned, axis=1)
-            r = '{}_r'.format(x[:-2])
-            df.loc[:, r] = dist
+#         for x, y, z in zip(cols[::3], cols[1::3], cols[2::3]):
+#             coords_aligned = df.loc[:, [x, y, z]].values - c
+#             dist = np.linalg.norm(coords_aligned, axis=1)
+#             r = '{}_r'.format(x[:-2])
+#             df.loc[:, r] = dist
+
+# data = utl.load_data_hdf(cfg)
+# ball_centers = utl.load_ball_centers(cfg)
+
+# ball_centers['P9LT'] = ball
+# utl.add_distance(data, ball_centers)
+
+# # tranform coordinates
+# df = data['P9LT'].groupby('flynum').get_group(1).groupby('tnum').get_group(1)
+# df = utl.filter_frames(df)
 
 
 def norm_vec(x):
@@ -402,6 +691,12 @@ def transform_to_flycentric(df):
 #####################
 ## Plotting functions
 
+def save(fig, path):
+
+    if path:
+        fig.savefig(path)
+        plt.close(fig)
+
 def plot_coord_system(df, joints=['WH', 'ThC', 'Notum'], return_lims=False, lims=(), marker='o', marker_size=5, swing_gray=False, path=''):
     '''Plot distribution of joints projected on planes defined by basis vectors
 
@@ -490,6 +785,56 @@ def plot_coord_system(df, joints=['WH', 'ThC', 'Notum'], return_lims=False, lims
     
     fig.tight_layout()
 
-    if path:
-        fig.savefig(path)
-        plt.close(fig)
+    save(fig, path)
+
+def plot_r_distr(df, col_match, d_perc={}, xlims=(None, None), path=''):
+
+    # construct xyz str based on joint
+    cols = [ c for c in df.columns if col_match in c ]
+    
+    fig, axmat = plt.subplots(nrows=len(cols)//2, ncols=2, figsize=(10, len(cols)*1.5))
+
+    for ax, c in zip(axmat.T.flatten(), cols):
+
+        r = df.loc[:, c].values
+        perc = d_perc.get(c[:3], [5, 95])
+
+        # create arrays for three intervals
+        a, b = np.nanpercentile(r, perc)
+        r1 = r[r<a]
+        r2 = r[(r>a) & (r<b)]
+        r3 = r[r>b]
+
+        # plot
+        sns.histplot([r1, r2, r3], ax=ax, legend=False)
+        ax.set_title(c)
+        ax.set_xlim(xlims)
+
+    fig.tight_layout()
+    save(fig, path)
+
+def plot_stepcycle_pred(df, d_med, delta_r, path=''):
+
+    cols =  [ c for c in df.columns if 'TaG_r' in c ]
+    fig, axarr = plt.subplots(nrows=len(cols), figsize=(20, 20))
+
+    for ax, c in zip(axarr, cols,):
+
+        leg = '-'.join(c.split('-')[:2])
+
+        # on/off ball predictions
+        on = df.loc[:, '{}_stepcycle'.format(leg)]
+        off = ~on
+
+        # distance from ball center
+        r = df.loc[:, c]
+
+        sns.scatterplot(r.loc[on], ax=ax)
+        sns.scatterplot(r.loc[off], ax=ax)
+        
+        # plot "median" and thresh
+        r_m = d_med[leg]
+        ax.axhline(r_m, c='gray')
+        ax.axhline(r_m + delta_r, c='gray', ls='--')
+        
+    save(fig, path)
