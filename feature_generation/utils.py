@@ -838,3 +838,37 @@ def plot_stepcycle_pred(df, d_med, delta_r, path=''):
         ax.axhline(r_m + delta_r, c='gray', ls='--')
         
     save(fig, path)
+
+
+def plot_stepcycle_pred_grid(df, d_med, delta_r, path=''):
+
+    cols =  [ c for c in df.columns if 'TaG_r' in c ]
+    trials = df.loc[:, 'tnum'].unique()
+    fig, axmat = plt.subplots(nrows=len(trials), ncols=len(cols), figsize=(40, 4*len(trials)))
+
+    for axarr, c in zip(axmat.T, cols,):
+        for ax, (t, df_t) in zip(axarr, df.groupby('tnum')):
+
+            leg = '-'.join(c.split('-')[:2])
+
+            # on/off ball predictions
+            on = df_t.loc[:, '{}_stepcycle'.format(leg)]
+            off = ~on
+
+            # distance from ball center
+            r = df_t.loc[:, c]
+
+            sns.scatterplot(r.loc[on], ax=ax)
+            sns.scatterplot(r.loc[off], ax=ax)
+            sns.lineplot(r, ax=ax, color='gray', lw=0.5)
+            
+            # plot "median" and thresh
+            r_m = d_med[leg]
+            ax.axhline(r_m, c='gray')
+            ax.axhline(r_m + delta_r, c='gray', ls='--')
+
+            ax.set_title('leg {} | trial {}'.format(leg, t))
+    
+    fig.tight_layout()
+        
+    save(fig, path)
