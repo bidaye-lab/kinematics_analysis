@@ -234,6 +234,7 @@ def get_xyz_mean(df, point):
 
     return xyz
 
+
 def get_ball0(df, d=4.5):
     '''Generate initial guess based on average postitions of TaG and Notum.
     Calculates vector connecting average Notum with average TaG positions
@@ -308,7 +309,7 @@ def cost_fun(x, l_pnts, l_perc):
 
 
 
-def fit_ball(df, xyz0, r0, d_perc):
+def fit_ball(df, d_perc, s_ball0=4.7, s_r0=3.5):
     '''Fit sphere based on TaG coordinates, the initial guess for the ball
     coordinates and percentiles for each leg indicating the points used for fitting
 
@@ -316,13 +317,13 @@ def fit_ball(df, xyz0, r0, d_perc):
     ----------
     df : pd.DataFrame
         Data frame with TaG xyz coordinates to be used for fitting
-    xyz0 : np.array 3x1
-        initial guess for ball center
-    r0 : float
-        initial guess for ball radius
     d_perc : dict
         Dict of tuples, maps leg names to percentile used for each leg
         e.g. 'R-F': (25, 75)
+    s_ball0 : float, optinonal
+        scaling factor: ball0 is s_ball0 * distance WH along Notum->avg TaG positions
+    s_r0 : float, optional
+        scaling factor: r0 is s_r0 * distance WH
 
     Returns
     -------
@@ -339,6 +340,20 @@ def fit_ball(df, xyz0, r0, d_perc):
         cs = [ c_x[:-1] + i for i in 'xyz' ]
         l_pnts.append(df.loc[:, cs].values)
         l_perc.append(d_perc[c_x[:3]])
+
+
+    # wing hinge distance
+    lwh = get_xyz_mean(df, 'L-WH')
+    rwh = get_xyz_mean(df, 'R-WH')
+    dwh = np.linalg.norm(lwh - rwh)
+
+    # get initial guess for ball0 based on average notum/tag and WH distance
+    xyz0 = get_ball0(df, d=s_ball0*dwh)
+    # get r0 based on WH distance
+    r0 = s_r0 * dwh
+    
+    print('INFO: scaling WH distance = {:1.3f} with factors s_ball0 = {:1.3f} and s_r0 = {:1.3f}'.format(dwh, s_ball0, s_r0))
+    print('INFO: initial guess for ball center x = {:1.3f} y = {:1.3f} z = {:1.3f} | radius {:1.3f}'.format(*xyz0, r0))
 
     # initial guess
     x0 = np.array([*xyz0, r0])
@@ -794,6 +809,9 @@ def plot_r_distr(df, col_match, d_perc={}, xlims=(None, None), path=''):
     
     fig, axmat = plt.subplots(nrows=len(cols)//2, ncols=2, figsize=(10, len(cols)*1.5))
 
+    rmin = df.loc[:, cols].min().min()
+    rmax = df.loc[:, cols].max().max()
+    
     for ax, c in zip(axmat.T.flatten(), cols):
 
         r = df.loc[:, c].values
@@ -806,7 +824,7 @@ def plot_r_distr(df, col_match, d_perc={}, xlims=(None, None), path=''):
         r3 = r[r>b]
 
         # plot
-        sns.histplot([r1, r2, r3], ax=ax, legend=False)
+        sns.histplot([r1, r2, r3], ax=ax, legend=False, binrange=(rmin, rmax))
         ax.set_title(c)
         ax.set_xlim(xlims)
 
