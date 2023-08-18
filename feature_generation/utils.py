@@ -3,6 +3,7 @@ import numpy as np
 from scipy.optimize import minimize
 
 import matplotlib.pylab as plt
+from matplotlib.colors import Normalize
 import seaborn as sns
 
 import yaml
@@ -889,4 +890,45 @@ def plot_stepcycle_pred_grid(df, d_med, delta_r, path=''):
     
     fig.tight_layout()
         
+    save(fig, path)
+
+
+def plot_trajectory(df, arrows=True, rotate_first=False, cmap='coolwarm', path=''):
+
+    df = df.loc[:, ['x_vel', 'y_vel', 'z_vel']]
+
+    x, y, d = 0, 0, 0
+    xs, ys, ds = [], [], []
+    for xi, yi, di in df.values:
+
+        if rotate_first:
+            d += di
+
+        x += np.cos(d) * xi + np.cos(d - np.pi/2) * -yi
+        y += np.sin(d) * xi + np.sin(d - np.pi/2) * -yi
+        
+        if not rotate_first:
+            d += di
+
+        xs.append(x)
+        ys.append(y)
+        ds.append(d)
+        
+    x = np.array(xs)
+    y = np.array(ys)
+    d = np.array(ds)
+    c = df.loc[:, 'z_vel']
+
+    vmax = np.max(np.abs(c))
+    norm = Normalize(vmin=-vmax, vmax=vmax)
+
+    fig, ax = plt.subplots()
+    if arrows:
+        ax.quiver(x, y, np.cos(d), np.sin(d), c, cmap=cmap, norm=norm)
+    else:
+        ax.scatter(x, y, s=1)
+    ax.set_xlabel('x')
+    ax.set_ylabel('y')
+
+    fig.tight_layout()
     save(fig, path)
