@@ -825,7 +825,13 @@ def plot_r_distr(df, col_match, d_perc={}, xlims=(None, None), path=''):
         r3 = r[r>b]
 
         # plot
-        sns.histplot([r1, r2, r3], ax=ax, legend=False, binrange=(rmin, rmax))
+        sns.histplot(data=[r1, r2, r3], 
+                     ax=ax, 
+                     legend=False, 
+                     binrange=(rmin, rmax), 
+                     binwidth=0.00025, 
+                     multiple='stack'
+                     )
         ax.set_title(c)
         ax.set_xlim(xlims)
 
