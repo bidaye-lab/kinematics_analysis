@@ -442,7 +442,7 @@ def get_r_median(df, d_perc):
 
     return d_med
 
-def add_stepcycle_pred(df, r_med, delta_r, min_on, min_off):
+def add_stepcycle_pred(df, r_med, d_delta_r, min_on, min_off):
     '''Add columns with stepcycle predictions based on the TaG_r columns
     and multiple thresholds as explained below
 
@@ -452,8 +452,9 @@ def add_stepcycle_pred(df, r_med, delta_r, min_on, min_off):
         Data frame to which to add columns. Must contain TaG_r columns
     r_med : dict
         Mapping between leg and surface distance for that leg, e.g. 'R-M': 2.98
-    delta_r : float
-        distance above r_med to be considered on the ball
+    d_delta_r : dict
+        Cutoff distance above r_med to be considered on the ball.
+        Dict to define on per leg basis, e.g. d_delta_r['R-M'] = 0.05
     min_on : int
         ignore on steps if frames less than min_on
     min_off : int
@@ -468,13 +469,12 @@ def add_stepcycle_pred(df, r_med, delta_r, min_on, min_off):
     df = df.copy()
 
     # cycle through legs
-    cols =  [ c for c in df.columns if 'TaG_r' in c ]
-    for c in cols:
+    for leg, delta_r in d_delta_r.items():
         
-        leg = '-'.join(c.split('-')[:2])
+        col = f'{leg}-TaG_r'
 
         # distances from center of ball
-        r = df.loc[:, c]
+        r = df.loc[:, col]
         
         # on frames based on distance criterium
         on = r < (r_med[leg] + delta_r)
@@ -838,21 +838,20 @@ def plot_r_distr(df, col_match, d_perc={}, xlims=(None, None), path=''):
     fig.tight_layout()
     save(fig, path)
 
-def plot_stepcycle_pred(df, d_med, delta_r, path=''):
+def plot_stepcycle_pred(df, d_med, d_delta_r, path=''):
 
     cols =  [ c for c in df.columns if 'TaG_r' in c ]
     fig, axarr = plt.subplots(nrows=len(cols), figsize=(20, 20))
 
-    for ax, c in zip(axarr, cols,):
-
-        leg = '-'.join(c.split('-')[:2])
+    for ax, (leg, delta_r) in zip(axarr, d_delta_r.items()):
 
         # on/off ball predictions
         on = df.loc[:, '{}_stepcycle'.format(leg)]
         off = ~on
 
         # distance from ball center
-        r = df.loc[:, c]
+        col = f'{leg}-TaG_r'
+        r = df.loc[:, col]
 
         sns.scatterplot(r.loc[on], ax=ax)
         sns.scatterplot(r.loc[off], ax=ax)
