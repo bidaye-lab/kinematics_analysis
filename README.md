@@ -14,6 +14,7 @@ The script files `scripts/*.py` are workflows for the individual steps in the an
 ## old scripts
 These old scripts need to become part of the new code structure.
 - `scripts/old_scripts/feature_generation/coordinate_transformation.ipynb` incl `utils.py`
+- `scripts/old_scripts/feature_extraction` (i) BPN, (ii) P9LT, (iii), P9RT
 - `scripts/old_scripts/generate-dataset` MATLAB code (port to python?)
 - `scripts/old_scripts/regression_model/model.ipynb`
 
