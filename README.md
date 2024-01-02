@@ -9,7 +9,8 @@ The script files `scripts/*.py` are workflows for the individual steps in the an
 
 |script file|use case|
 |---|---|
-|`example.py`||
+|`ball_fitting_example.py`| fit ball to tarsal tips and predict swing and stance phase per frame and leg|
+|`ball_fitting_batch.py`| run ball fitting and stepcycle predictions in batch mode |
 
 ## old scripts
 These old scripts need to become part of the new code structure.
