@@ -15,110 +15,80 @@
 # ---
 
 # %%
+# %load_ext autoreload
+# %autoreload 2
+
 from pathlib import Path
-import pandas as pd
 
 from src import (
     data_loader as dl,
-    df_operations as dfo,
-    fitting as fit,
-    visualize as vis,
+    batch_helpers as bh,
 )
 
 # %% [markdown]
 # # Run ball fitting in batch mode
+#
+# First, we load the data structure, which is a dictionary of DataFrames.
+#
+# Then, we choose one of the DataFrames for further processing.
+#
+# Next, we define `out_folder` as the folder where the plots will be saved.
+# `params_path` is the file where the fitting parameters will be saved.
 
 # %%
 # load data
 cfg = dl.load_config('config.yml')
 data = dl.load_data_hdf(cfg['datafile'])
 
-# define percentiles for each leg
-d_perc = {
-    'R-F':  (25, 75),
-    'R-M':  (25, 75),
-    'R-H':  (25, 75),
-    'L-F':  (25, 75),
-    'L-M':  (25, 75),
-    'L-H':  (25, 75),
-}
-    
-# thresholds for step detection
-min_on, min_off = 2, 2 # mimimum number of frames for on/off step 
-d_delta_r = { # distance from median per leg (unit?)
-    'R-F': .05,
-    'R-M': .05,
-    'R-H': .05,
-    'L-F': .05,
-    'L-M': .05,
-    'L-H': .05,
-}
-# data frame for ball centers / radii
-df_ball = pd.DataFrame()
+# chose dataset
+name = 'P9RT'
+df = data[name]
 
-# cycle trough genotypes
-idx = 0
-for gen, df_gen in data.items():
+# output folder
+out_folder = Path(cfg['output_folder']) / f'ball_predictions/{name}/'
 
-    # plot folder
-    plot_folder = Path(cfg['plot_folder']) / 'ball_predictions/{}/'.format(gen)
-    plot_folder.mkdir(parents=True, exist_ok=True)
+# parameter file
+params_path = out_folder / 'fit_params.yml'
 
-    # cycle through flies
-    for fly, df_fly in df_gen.groupby('flynum'):
+# %% [markdown]
+# The `refine_fit_wrapper` function will cycle through all flies in `df` 
+# and fit the ball with the default parameter set defined in the `cfg` file.
+# For each fly it will create a subfolder in `out_folder` and the following plots:
+# - `r_distr_trial_{tnum}.png`
+# - `stepcycles_trial_{tnum}.png`
+# See `ball_fitting_example.py` for an explanation of the plots and parameters.
+#
+# Furthermore, the `params_path` file will be created after the first run,
+# containing the fitting parameters used for each fly.
+# The `params_path` file contains 'old' and a 'new' parameter set.
+# If you modify the 'new' parameter set, the fitting will be rerun.
+#
+# You can now:
+# - modify the 'global' parameter set will apply the new parameters to all flies
+# - modify either of the 'fly_{flynum}' parameter sets will only affect that fly
+#
+# Running `refine_fit_wrapper` again will look for changes in the `params_path` file
+# and rerun the analysis for the flies that have been modified.
 
-        print('INFO: processing genotype {} | fly {}'.format(gen, fly))
-        print('      ==================='.format(gen, fly))
-        
-        #######################
-        ## only use stim frames
-        df = dfo.filter_frames(df_fly)
+# %%
+# (re)run fitting 
+bh.refine_fit_wrapper(df, out_folder, params_path, cfg['ball_fitting_defaults'])
 
-        # fit ball
-        ball, r = fit.fit_ball(df, d_perc)
-        print('Optimized: ball center x = {:1.3f} y = {:1.3f} z = {:1.3f} | radius {:1.3f}'.format(*ball, r))
+# %% [markdown]
+# Once you are happy with the results, you can run the `add_stepcycle` function.
+# This will read the latest parameters from `params_path` and add the
+# stepcycle predictions as well as the distances of all points from the ball center to the `df` DataFrame.
+#
+# Finally, we write the updated DataFrame to the original data file (or write to a new file if you prefer).
 
-        # add distances from center 
-        df = dfo.add_distance(df, ball)
+# %%
+# add stepcycle predictions to df based on refined parameters
+bh.add_stepcyles(df, params_path)
 
-        # get "median" for TaG_r for each leg
-        d_med = dfo.get_r_median(df, d_perc)
+# add back to data dict
+data[name] = df
 
-        # write to df_ball
-        df_ball.loc[idx, 'genotype'] = gen
-        df_ball.loc[idx, 'flynum'] = fly
-        df_ball.loc[idx, ['ball_x', 'ball_y', 'ball_z']] = ball
-        df_ball.loc[idx, 'r'] = r
-        for k, v in d_perc.items():
-            df_ball.at[idx, 'perc_low_{}'.format(k)] = v[0]
-            df_ball.at[idx, 'perc_high_{}'.format(k)] = v[1]
-        idx += 1
+# save to disk
+dl.write_data_dict(data, cfg['datafile'])
 
-        #######################
-        ## all frames
-
-        # add distances from center 
-        df_fly = dfo.add_distance(df_fly, ball)
-
-        # step cycles
-        df_fly = dfo.add_stepcycle_pred(df_fly, d_med, d_delta_r, min_on, min_off)
-
-        # add back to data dict
-        data[gen].loc[df_fly.index, df_fly.columns] = df_fly
-
-        #####################
-        ## plot for stim only
-        df = dfo.filter_frames(df_fly)
-
-        # plot r distribution
-        vis.plot_r_distr(df, 'TaG_r', d_perc, path=plot_folder / 'r_distr_fly{}.png'.format(fly))
-        
-        # plot stepcycles 
-        vis.plot_stepcycle_pred_grid(df, d_med, d_delta_r, path=plot_folder / 'stepcycles_{}.png'.format(fly))
-
-# store on disk
-path_df_ball = Path(cfg['data_folder']) / 'df_ball.parquet'
-df_ball.to_parquet(path_df_ball)
-
-out_file = Path(cfg['data_folder']) / 'df_preproc.parquet'
-dl.write_data_dict(data, out_file)
+# %%
