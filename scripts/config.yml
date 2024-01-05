@@ -1,4 +1,21 @@
-datafile: /home/nico/remmina/data/kinematics/alldata_V5.h5
+datafile: C:\temp\kinematics\alldata_V5.h5
+output_folder:  C:\temp\kinematics\output_alldata_V5\
 
-# plot_folder: ./plots/
-# data_folder: ./data/
+ball_fitting_defaults:
+  pct_range:
+    R-F: [5, 85]
+    R-M: [5, 85]
+    R-H: [5, 85]
+    L-F: [5, 85]
+    L-M: [5, 85]
+    L-H: [5, 85]
+  min_on: 2
+  min_off: 2
+  d_delta_r:
+    R-F: 0.05
+    R-M: 0.05
+    R-H: 0.05
+    L-F: 0.05
+    L-M: 0.05
+    L-H: 0.05
+  fit_frames: [400, 1400]
