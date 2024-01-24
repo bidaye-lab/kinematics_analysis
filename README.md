@@ -24,6 +24,7 @@ These old scripts need to become part of the new code structure.
 ```
 # create conda environment with necessary dependencies
 conda env create -n kinematics_analysis -f environment.yml
+conda activate kinematics_analysis
 
 # get source code
 git clone https://github.com/bidaye-lab/kinematics_analysis
