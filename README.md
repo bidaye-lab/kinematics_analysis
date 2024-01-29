@@ -12,7 +12,7 @@ The script files `scripts/*.py` are workflows for the individual steps in the an
 |`ball_fitting_example.py`| fit ball to tarsal tips and predict swing and stance phase per frame and leg|
 |`ball_fitting_batch.py`| run ball fitting and stepcycle predictions in batch mode |
 
-For informatiton on the datastructure [see here](docs\data_structure.md)
+For informatiton on the datastructure [see here](docs/data_structure.md)
 
 ## old scripts
 These old scripts need to become part of the new code structure.
