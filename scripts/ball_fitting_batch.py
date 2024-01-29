@@ -24,6 +24,7 @@ from src import (
     data_loader as dl,
     batch_helpers as bh,
 )
+from src.xyz_trajectory import generate_xyz as xyz
 
 # %% [markdown]
 # # Run ball fitting in batch mode
@@ -37,24 +38,24 @@ from src import (
 
 # %%
 # load data
-cfg = dl.load_config('config.yml')
-data = dl.load_data_hdf(cfg['datafile'])
+cfg = dl.load_config("config.yml")
+data = dl.load_data_hdf(cfg["datafile"])
 
 # chose dataset
-name = 'BDN2'
+name = "BDN2"
 df = data[name]
 
 # output folder
-out_folder = Path(cfg['output_folder']) / f'ball_predictions/{name}/'
+out_folder = Path(cfg["output_folder"]) / f"ball_predictions/{name}/"
 
 # parameter file
-params_path = out_folder / 'fit_params.yml'
+params_path = out_folder / "fit_params.yml"
 
 # output file with ball prediction columns added
-output_file = out_folder / 'df_ballpredictn.parquet' 
+output_file = out_folder / "df_ballpredictn.parquet"
 
 # %% [markdown]
-# The `refine_fit_wrapper` function will cycle through all flies in `df` 
+# The `refine_fit_wrapper` function will cycle through all flies in `df`
 # and fit the ball with the default parameter set defined in the `cfg` file.
 # For each fly it will create a subfolder in `out_folder` and the following plots:
 # - `r_distr_trial_{tnum}.png`
@@ -74,8 +75,8 @@ output_file = out_folder / 'df_ballpredictn.parquet'
 # and rerun the analysis for the flies that have been modified.
 
 # %%
-# (re)run fitting 
-bh.refine_fit_wrapper(df, out_folder, params_path, cfg['ball_fitting_defaults'])
+# (re)run fitting
+bh.refine_fit_wrapper(df, out_folder, params_path, cfg["ball_fitting_defaults"])
 
 # %% [markdown]
 # Once you are happy with the results, you can run the `add_stepcycle` function.
@@ -94,4 +95,19 @@ data[name] = df
 # save to disk
 dl.write_data_dict(data, output_file)
 
+# %% [markdown]
+# # generate XYZ files for all fits
+
 # %%
+# generate files for all data
+for gen, df_gen in data.items():
+    print(f"INFO generating xyz for {gen}")
+    for flynum, df_fly in df_gen.groupby("flynum"):
+        ball = [
+            df.loc[:, "x_ball"].unique().item(),
+            df.loc[:, "y_ball"].unique().item(),
+            df.loc[:, "z_ball"].unique().item(),
+        ], 
+        r = df.loc[:, "r_ball"].unique().item()
+        xyz.write_xyz(df_fly, out_name=f"{gen}_fly{flynum}.xyz", split=1400, ball=ball)
+        print(f'INFO gen {gen} | fly {flynum} | r_ball {r}')
