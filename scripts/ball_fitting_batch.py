@@ -41,7 +41,7 @@ cfg = dl.load_config('config.yml')
 data = dl.load_data_hdf(cfg['datafile'])
 
 # chose dataset
-name = 'P9RT'
+name = 'BDN2'
 df = data[name]
 
 # output folder
@@ -49,6 +49,9 @@ out_folder = Path(cfg['output_folder']) / f'ball_predictions/{name}/'
 
 # parameter file
 params_path = out_folder / 'fit_params.yml'
+
+# output file with ball prediction columns added
+output_file = out_folder / 'df_ballpredictn.parquet' 
 
 # %% [markdown]
 # The `refine_fit_wrapper` function will cycle through all flies in `df` 
@@ -89,6 +92,6 @@ bh.add_stepcyles(df, params_path)
 data[name] = df
 
 # save to disk
-dl.write_data_dict(data, cfg['datafile'])
+dl.write_data_dict(data, output_file)
 
 # %%
