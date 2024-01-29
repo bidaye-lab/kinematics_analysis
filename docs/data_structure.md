@@ -14,7 +14,7 @@ Each dataframe can contain multiple trials from multiple recording sessions.
 |e.g. `R-F-ThC_x: float`|x coordinate of thorax-coxa joint in right front leg, a.u. (see below)|
 |e.g. `R-WH_x: float`|x coordinate of right wing hinge, a.u. (see below)|
 |e.g. `Notum_x: float`|x coordinate of the notum, a.u. (see below)|
-|e.g. `L1A_abduct: float` | TODO | 
+|e.g. `L1A_abduct: float` | abduction angle at the thorax-coxa joint of the Left front leg, degrees (see below) | 
 |e.g. `x_pos: float` | x ball position at each frame (see below) | 
 |e.g. `x_vel: float` | x ball velocity at each frame (see below) |
 |e.g. `R-F_stepcycle: bool` | indicating if right front leg is touching the surface (`True`) or not (`False`)|
@@ -37,13 +37,28 @@ The naming convention for columns positions is as follows:
 The naming convention for the angles is as follows:
 - leg
     - `R`: right or `L`: left side
-    - `1`: TODO
+    - `1`: Front leg or `2` : Mid  leg or `3` : Hind leg
 - joint
-    - `A`: TODO
+    - `A`: Thorax-Coxa joint
+    - `B`: Coxa-Trocanter joint
+    - `C`: Femur-Tibia joint
+    - `D`: Tibia-Tarsus joint
 - angle
     - `abduct`: abduction
     - `flex`: flexion
     - `rot`: rotation
+
+ - Degrees of Freedom for tracked points
+    - Wing hinges (count =2) , notum (count =1)  and all thorax coxa points (count = 6) are all 'fixed points' with little jitter 
+    - All the 4 joints on the leg are assumed to be moving with limited degrees of freedom (DoF). For example, for the left front leg:
+        - Thorax-Coxa joint (L1A): abduction, flexion and rotation
+        - Coxa-Trocanter (L1B) : flexion and rotation
+        - Femur-Tibia (L1C): flexion and rotation
+        - Tibia-Tarsus (L1D) : flexion only
+    - For the Thorax-Coxa joints one of the 3 points defining each DoF is a point on the body of the fly. Definitions are as follows for the left front leg:
+        - `abduction` : L-WH -> L-F-ThC -> L-F-CTr
+        - `flexion` : Notum -> L-F-ThC -> L-F-CTr
+        - `rotation`: L-F-ThC-> L-F-CTr->L-F-FeTi  (defined as the roation of the line segment defined by the latter two points around the axis defined by the first two points)
 
 Important: The coordinate system for the points on the fly body is different than the coordinate system for the ball movement.
 
