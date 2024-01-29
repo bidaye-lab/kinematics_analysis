@@ -24,6 +24,7 @@ from src import (
     fitting as fit,
     visualize as vis,
 )
+from src.xyz_trajectory import generate_xyz as xyz
 
 # %% [markdown]
 # # data structure
@@ -37,7 +38,7 @@ from src import (
 
 # %%
 # load HDF file as dict of dataframes
-cfg = dl.load_config('config.yml')
+cfg = dl.load_config('config_local.yml')
 data = dl.load_data_hdf(cfg['datafile'])
 
 # %% [markdown]
@@ -109,6 +110,12 @@ print('INFO: optimized ball center x = {:1.3f} y = {:1.3f} z = {:1.3f} | radius 
 # add distances from center to df
 df = dfo.add_distance(df, ball)
 
+# add ball info
+df.loc[:, 'x_ball'] = ball[0]
+df.loc[:, 'y_ball'] = ball[1]
+df.loc[:, 'z_ball'] = ball[2]
+df.loc[:, 'r_ball'] = r
+
 # %% [markdown]
 # The visualization of the tarsal tip distances from the ball cetner are an important quality control.
 # The percentile ranges should be adjusted that the center distribution is narrow and centered around the ball radius.
@@ -157,5 +164,17 @@ df = dfo.add_stepcycle_pred(df, d_med, d_delta_r, min_on, min_off)
 
 # %%
 # plot example trial
-df_trl = df.groupby('trial').get_group(1)
+df_trl = df.groupby('tnum').get_group(1)
 vis.plot_stepcycle_pred(df_trl, d_med, d_delta_r)
+
+# %% [markdown]
+# # 3D visualization
+# We can generate so-called trajectory files that can be read by a molecular viewer such as VMD.
+#
+# Here, `split > 0` writes a separate file after `split` frames. If `ball` is supplied, the ball coordinates are written to the file.
+#
+# Note that you will need to enter `ball X` in to the VMD terminal, where `X = 5.0 * r`.
+
+# %%
+# generate files for one fly
+xyz.write_xyz(df, out_name='test.xyz', split=1400, ball=ball)

@@ -154,6 +154,12 @@ def fit_ball_wrapper(df, params):
     # add distances from center for all frames
     df = dfo.add_distance(df, ball)
 
+    # add ball info
+    df.loc[:, 'x_ball'] = ball[0]
+    df.loc[:, 'y_ball'] = ball[1]
+    df.loc[:, 'z_ball'] = ball[2]
+    df.loc[:, 'r_ball'] = r
+
     # step cycles
     df = dfo.add_stepcycle_pred(df, d_med, d_delta_r, min_on, min_off)
 
