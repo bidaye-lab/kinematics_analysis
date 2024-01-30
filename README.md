@@ -9,10 +9,16 @@ The script files `scripts/*.py` are workflows for the individual steps in the an
 
 |script file|use case|
 |---|---|
-|`ball_fitting_example.py`| fit ball to tarsal tips and predict swing and stance phase per frame and leg|
-|`ball_fitting_batch.py`| run ball fitting and stepcycle predictions in batch mode |
+|[`ball_fitting_example.py`](scripts/ball_fitting_example.py)| fit ball to tarsal tips and predict swing and stance phase per frame and leg|
+|[`ball_fitting_batch.py`](scripts/ball_fitting_batch.py)| run ball fitting and stepcycle predictions in batch mode |
 
-For informatiton on the datastructure [see here](docs/data_structure.md)
+## Documentation
+The analysis pipelines contain most information needed to understand how to work with the data.
+Some additional information is provided for:
+|file|content|
+|---|---|
+|[data_structure.md](docs/data_structure.md)|Data structure generated with DLC/anipose|
+|[3D_visualization.md](docs/3D_visualization.md)|3D visualization using VMD molecular viewer|
 
 ## old scripts
 These old scripts need to become part of the new code structure.
@@ -20,7 +26,6 @@ These old scripts need to become part of the new code structure.
 - `scripts/old_scripts/feature_extraction` (i) BPN, (ii) P9LT, (iii), P9RT
 - `scripts/old_scripts/generate-dataset` MATLAB code (port to python?)
 - `scripts/old_scripts/regression_model/model.ipynb`
-
 
 ## Installation
 ```
