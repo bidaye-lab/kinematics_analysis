@@ -177,4 +177,5 @@ vis.plot_stepcycle_pred(df_trl, d_med, d_delta_r)
 
 # %%
 # generate files for one fly
-xyz.write_xyz(df, out_name='test.xyz', split=1400, ball=ball)
+for t, df_trl in df.groupby('tnum'):
+    xyz.write_xyz(df_trl, out_name=f'trial_{t}.xyz', split=0, ball=ball)

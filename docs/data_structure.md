@@ -9,7 +9,7 @@ Each dataframe can contain multiple trials from multiple recording sessions.
 |---|---|
 |`flynum: int`|integer specifying specimen, 1-based|
 |`trial: int`|integer specifying trial number, 1-based|
-|`fnum: int`|integer specifying frame number, 0-based, resets for each `flynum` but not `tnum` |
+|`fnum: int`|integer specifying frame number, 0-based, resets for each `flynum` but not `tnum` (see below)|
 |`SF: int`|stimulation frequency in given `tnum`, Hz|
 |e.g. `R-F-ThC_x: float`|x coordinate of thorax-coxa joint in right front leg, a.u. (see below)|
 |e.g. `R-WH_x: float`|x coordinate of right wing hinge, a.u. (see below)|
@@ -18,6 +18,8 @@ Each dataframe can contain multiple trials from multiple recording sessions.
 |e.g. `x_pos: float` | x ball position at each frame (see below) | 
 |e.g. `x_vel: float` | x ball velocity at each frame (see below) |
 |e.g. `R-F_stepcycle: bool` | indicating if right front leg is touching the surface (`True`) or not (`False`)|
+
+Note that each trial is 1400 frames, 600-1000 are optically stimulated.
 
 The naming convention for columns positions is as follows:
 - leg

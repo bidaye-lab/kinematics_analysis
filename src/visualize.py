@@ -107,8 +107,11 @@ def plot_stepcycle_pred(df, d_med, d_delta_r, vspan=(), path=""):
         col = f"{leg}-TaG_r"
         r = df.loc[:, col]
 
-        sns.scatterplot(r.loc[on], ax=ax)
-        sns.scatterplot(r.loc[off], ax=ax)
+        # corresponding frame number
+        f = df.loc[:, 'fnum']
+
+        sns.scatterplot(x=f.loc[on], y=r.loc[on], ax=ax)
+        sns.scatterplot(x=f.loc[off], y=r.loc[off], ax=ax)
 
         # plot background box
         if vspan:
