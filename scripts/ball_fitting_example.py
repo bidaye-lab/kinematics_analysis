@@ -38,7 +38,7 @@ from src.xyz_trajectory import generate_xyz as xyz
 
 # %%
 # load HDF file as dict of dataframes
-cfg = dl.load_config('config_local.yml')
+cfg = dl.load_config('config.yml')
 data = dl.load_data_hdf(cfg['datafile'])
 
 # %% [markdown]
