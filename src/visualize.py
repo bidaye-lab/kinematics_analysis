@@ -115,8 +115,8 @@ def plot_stepcycle_pred(df, d_med, d_delta_r, vspan=(), path=""):
 
         # plot background box
         if vspan:
-            x0 = vspan[0] + r.index.min()
-            xf = vspan[1] + r.index.min()
+            x0 = vspan[0] + f.min()
+            xf = vspan[1] + f.min()
             ax.axvspan(x0, xf, color="k", alpha=0.05)
 
         # plot "median" and thresh
