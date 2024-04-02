@@ -5,12 +5,12 @@ For more information on the structure of this repo,
 see this [template repo](https://github.com/bidaye-lab/template_data_pipelines).
 
 ## Analysis pipelines
-The script files `scripts/*.py` are workflows for the individual steps in the analysis pipeline.
+The notebook files `notebooks/*.ipynb` are workflows for the individual steps in the analysis pipeline.
 
-|script file|use case|
+|notebook file|use case|
 |---|---|
-|[`ball_fitting_example.py`](scripts/ball_fitting_example.py)| fit ball to tarsal tips and predict swing and stance phase per frame and leg|
-|[`ball_fitting_batch.py`](scripts/ball_fitting_batch.py)| run ball fitting and stepcycle predictions in batch mode |
+|[`ball_fitting_example.ipynb`](notebooks/ball_fitting_example.ipynb)| fit ball to tarsal tips and predict swing and stance phase per frame and leg|
+|[`ball_fitting_batch.ipynb`](notebooks/ball_fitting_batch.ipynb)| run ball fitting and stepcycle predictions in batch mode |
 
 ## Documentation
 The analysis pipelines contain most information needed to understand how to work with the data.
@@ -22,10 +22,10 @@ Some additional information is provided for:
 
 ## old scripts
 These old scripts need to become part of the new code structure.
-- `scripts/old_scripts/feature_generation/coordinate_transformation.ipynb` incl `utils.py`
-- `scripts/old_scripts/feature_extraction` (i) BPN, (ii) P9LT, (iii), P9RT
-- `scripts/old_scripts/generate-dataset` MATLAB code (port to python?)
-- `scripts/old_scripts/regression_model/model.ipynb`
+- `notebooks/old_notebooks/feature_generation/coordinate_transformation.ipynb` incl `utils.py`
+- `notebooks/old_notebooks/feature_extraction` (i) BPN, (ii) P9LT, (iii), P9RT
+- `notebooks/old_notebooks/generate-dataset` MATLAB code (port to python?)
+- `notebooks/old_notebooks/regression_model/model.ipynb`
 
 ## Installation
 ```
