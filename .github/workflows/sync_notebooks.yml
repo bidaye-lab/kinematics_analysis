@@ -3,9 +3,6 @@ name: Sync between Jupyter notebooks and Python plain text files
 on:
   pull_request:
     types: [opened, synchronize]
-  push:
-    branches:
-      - main
 
 jobs:
   sync_notebooks:
