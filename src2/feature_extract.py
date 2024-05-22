@@ -11,7 +11,7 @@ import scipy
 from scipy.optimize import minimize
 from matplotlib.colors import Normalize
 
-
+## define the column indices of the corresponding TaG coordinates
 L1_TaG_idx = [61, 62, 63]
 R1_TaG_idx = [16, 17, 18]
 L2_TaG_idx = [76, 77, 78]
@@ -142,6 +142,68 @@ def get_temp_params_2(leg_steps_velfilt):
         return new_velfilt_df
 
 
+def magnitude(vector):
+    return math.sqrt(sum(pow(element, 2) for element in vector))
+
+
+def get_heading_direction_vector(df):
+    """Get the heading direction vector; deifned as the vector joining the notumm to the mid point of thee line joining the wing hinges
+
+    Parameters
+    ----------
+    df : DataFrame
+        Raw data table with position coordinates of all tracked points
+
+    Returns
+    -------
+    tuple
+        line segment defining the forward direction of the fly
+    """
+
+    x_mid = (np.mean(df["L-WH_x"]) + np.mean(df["R-WH_x"])) / 2
+    y_mid = (np.mean(df["L-WH_y"]) + np.mean(df["R-WH_y"])) / 2
+    # z_mid = (np.mean(df["L-WH_z"]) + np.mean(df["R-WH_z"])) / 2
+
+    # ref_WH = (x_mid, y_mid, z_mid)
+    ref_WH = (x_mid, y_mid)
+
+    Ref_vector = (
+        np.mean(df["Notum_x"]) - ref_WH[0],
+        np.mean(df["Notum_y"]) - ref_WH[1],
+        # np.mean(df["Notum_z"]) - ref_WH[2],
+    )
+    return Ref_vector
+
+
+def get_stepping_direction(Ref_vector, TD_coords, LO_coords):
+    """Returns the angle of each step with respect to the heading direction of the for each stance trajectory
+
+    Parameters
+    ----------
+    Ref_vector : tuple
+        _description_
+    stepdata : _type_
+        _description_
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
+    test = (
+        LO_coords.iloc[0, 0] - TD_coords.iloc[0, 0],
+        LO_coords.iloc[0, 1] - TD_coords.iloc[0, 1],
+        # LO_coords.iloc[0, 2] - TD_coords.iloc[0, 2]
+    )
+    angle = np.degrees(
+        np.arccos(
+            (np.dot(Ref_vector, test) / (magnitude(Ref_vector) * magnitude(test)))
+        )
+    )
+
+    return angle
+
+
 def get_stance_dist2(leg_steps_velfilt, data, leg, BL=1):
     """Quantifies and appends stance distance to input df
 
@@ -180,6 +242,7 @@ def get_stance_dist2(leg_steps_velfilt, data, leg, BL=1):
         TD_pos_df = pd.DataFrame()
         LO_pos_df = pd.DataFrame()
         Stance_dist = []
+        # Stance_dir = []
 
         TD_arr = leg_steps_velfilt["TD"]
         LO_arr = leg_steps_velfilt["LO"]
@@ -188,7 +251,12 @@ def get_stance_dist2(leg_steps_velfilt, data, leg, BL=1):
             LO_pos_step = pd.DataFrame(Leg_TaG.iloc[int(LO_arr[step]), :]).T
             stance_dist_step = math.dist(TD_pos_step.iloc[0, :], LO_pos_step.iloc[0, :])
 
+            # direction_step = get_stepping_direction(
+            #     Ref_vector, TD_pos_step, LO_pos_step
+            # )
+
             Stance_dist.append(stance_dist_step)
+            # Stance_dir.append(direction_step)
         #     TD_pos_df = pd.concat([TD_pos_df, TD_pos_step.reset_index(drop=True)], axis=0).reset_index(drop=True)
         #     LO_pos_df = pd.concat([LO_pos_df, LO_pos_step.reset_index(drop=True)], axis=0).reset_index(drop=True)
 
@@ -196,6 +264,9 @@ def get_stance_dist2(leg_steps_velfilt, data, leg, BL=1):
         # LO_pos_df.columns = ['LO_TaG_x', 'LO_TaG_y','LO_TaG_z']
         Stance_dist_norm = pd.DataFrame([elem / BL for elem in Stance_dist])
         Stance_dist_norm.columns = ["stance_dist_norm"]
+
+        # Stance_dir = pd.DataFrame(Stance_dir)
+        # Stance_dir.columns = ["stance_dir"]
 
         # Leg_all_data = pd.concat([leg_steps_velfilt, Stance_dist_norm, TD_pos_df, LO_pos_df], axis = 1)
         Leg_all_data = pd.concat([leg_steps_velfilt, Stance_dist_norm], axis=1)
@@ -230,7 +301,7 @@ def get_ang_params(temp_win, leg):
 
     ang_name_dict = {}
 
-    ang_list = ["A_flex", "B_flex", "C_flex", "A_rot", "B_rot", "C_rot"]
+    ang_list = ["A_flex", "B_flex", "C_flex", "A_rot", "B_rot", "C_rot", "A_abduct"]
 
     for ang in ang_list:
         if np.mean(temp_win[leg + ang]) > 0:
@@ -339,13 +410,22 @@ def smoothed_table(genotype, window):
                 ],
             )
 
+            # Heading_vector = get_heading_direction_vector(data)
+
             for i in range(len(data_stim) - window):
                 temp_win = data_stim.iloc[i : i + window, :].reset_index(drop=True)
 
                 mean_z_vel = np.mean(abs(temp_win["z_vel"]))
+                mean_y_vel = np.mean(abs(temp_win["y_vel"]))
                 mean_x_vel = np.mean(temp_win["x_vel"])
-                vel_df = pd.DataFrame([fly, t, mean_x_vel, mean_z_vel]).T
-                vel_df.columns = ["flynum", "tnum", "mean_x_vel", "mean_z_vel"]
+                vel_df = pd.DataFrame([fly, t, mean_x_vel, mean_y_vel, mean_z_vel]).T
+                vel_df.columns = [
+                    "flynum",
+                    "tnum",
+                    "mean_x_vel",
+                    "mean_y_vel",
+                    "mean_z_vel",
+                ]
 
                 L1_stepdata = get_stance_dist2(
                     get_temp_params_2(align_arr(get_TD_LO(temp_win, "L1"))),
