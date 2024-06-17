@@ -20,7 +20,7 @@ L3_TaG_idx = [91, 92, 93]
 R3_TaG_idx = [46, 47, 48]
 
 
-def get_TD_LO(df, Leg):
+def get_TD_LO(df, Leg, idx_ts):
     """Extracts touchdown and liftoff frame indices from genotype dataframe using step cycle predictions
 
     Parameters
@@ -57,7 +57,7 @@ def get_TD_LO(df, Leg):
 
         Leg_SC_init = pd.concat([Leg_TD_frame, Leg_LO_frame], axis=1)
         Leg_SC_init.columns = ["TD", "LO"]
-        return Leg_SC_init
+        return Leg_SC_init + idx_ts
     else:
         # raise TypeError("INFO: No touchdown-liftoff pair detected in dataframe")
         Leg_SC_init = pd.DataFrame()
@@ -82,16 +82,41 @@ def align_arr(SC_df):
         return pd.DataFrame()
     else:
         SC_df_new = pd.DataFrame()
-        TD_1 = int(SC_df.iloc[0, 0])
-        LO_1 = int(SC_df.iloc[0, 1])
+        ## get first TD and LO events
+        TD_1 = int(SC_df["TD"][0])
+        LO_1 = int(SC_df["LO"][0])
+
         if LO_1 < TD_1:  # if the first event is a lift off
-            LO_new = SC_df.iloc[1:, 1].reset_index(drop=True)
-            SC_df_new = pd.concat([SC_df.iloc[:, 0], LO_new], axis=1).dropna()
-            SC_df_new.columns = ["TD", "LO"]
+            # LO_new = SC_df.iloc[1:, 1].reset_index(drop=True)
+            # SC_df_new = pd.concat([SC_df.iloc[:, 0], LO_new], axis=1).dropna()
+            SC_df_new = pd.concat([SC_df["LO"], SC_df["TD"]], axis=1)
+            # SC_df_new.columns = ["TD", "LO"]
         else:
-            SC_df_new = SC_df.dropna()
+            SC_df_new = SC_df
 
         return SC_df_new
+
+
+def diff_row(df):
+    diff_list = []
+    for i in range(len(df)):
+        temp_diff = np.diff(np.array(df.iloc[i]))
+        diff_list.append(temp_diff[0])
+    return pd.DataFrame(diff_list).reset_index(drop=True)
+
+
+def diff_col(df):
+    return pd.DataFrame(np.diff(np.array(df.iloc[:, 0]))).reset_index(drop=True)
+
+
+def diff_next_step(df):
+    diff_list = []
+    for i in range(len(df) - 1):
+        event1 = df.iloc[i, 1]
+        event2 = df.iloc[i + 1, 0]
+        temp_diff = event2 - event1
+        diff_list.append(temp_diff.astype(float))
+    return pd.DataFrame(diff_list).reset_index(drop=True)
 
 
 def get_temp_params_2(leg_steps_velfilt):
@@ -111,33 +136,45 @@ def get_temp_params_2(leg_steps_velfilt):
     if leg_steps_velfilt.empty:
         return pd.DataFrame()
     else:
-        stance_dur = []
-        for i in range(len(leg_steps_velfilt)):
-            temp_td = leg_steps_velfilt["TD"][i]
-            temp_lo = leg_steps_velfilt["LO"][i]
-            temp_stance_dur = temp_lo - temp_td
-            stance_dur.append(int(temp_stance_dur))
+        if leg_steps_velfilt.columns[0] == "LO":
 
-        stance_dur = pd.DataFrame(stance_dur)
-        stance_dur.columns = ["stance_dur"]
+            swing_dur = diff_row(leg_steps_velfilt)
+            try:
+                swing_dur.columns = ["swing_dur"]
+            except:
+                swing_dur = pd.DataFrame(columns=["swing_dur"])
 
-        swing_dur = []
-        for i in range(len(leg_steps_velfilt) - 1):
-            curr_LO = leg_steps_velfilt["LO"][i]
-            next_TD = leg_steps_velfilt["TD"][i + 1]
-            curr_swing_dur = next_TD - curr_LO
-            swing_dur.append(int(curr_swing_dur))
-        swing_dur.append(np.nan)
-        swing_dur = pd.DataFrame(swing_dur)
-        swing_dur.columns = ["swing_dur"]
+            stance_dur = diff_next_step(leg_steps_velfilt)
+            try:
+                stance_dur.columns = ["stance_dur"]
+            except:
+                stance_dur = pd.DataFrame(columns=["stance_dur"])
 
-        Step_period = np.diff(leg_steps_velfilt["TD"]).tolist()
-        Step_period.append(np.nan)
-        Step_period = pd.DataFrame(Step_period)
-        Step_period.columns = ["step_period"]
+            step_period = diff_col(leg_steps_velfilt)
+            try:
+                step_period.columns = ["step_period"]
+            except:
+                step_period = pd.DataFrame(columns=["step_period"])
+
+        else:
+            swing_dur = diff_next_step(leg_steps_velfilt)
+            try:
+                swing_dur.columns = ["swing_dur"]
+            except:
+                swing_dur = pd.DataFrame(columns=["swing_dur"])
+            stance_dur = diff_row(leg_steps_velfilt)
+            try:
+                stance_dur.columns = ["stance_dur"]
+            except:
+                stance_dur = pd.DataFrame(columns=["stance_dur"])
+            step_period = diff_col(leg_steps_velfilt)
+            try:
+                step_period.columns = ["step_period"]
+            except:
+                step_period = pd.DataFrame(columns=["step_period"])
 
         new_velfilt_df = pd.concat(
-            [leg_steps_velfilt, Step_period, swing_dur, stance_dur], axis=1
+            [leg_steps_velfilt, step_period, swing_dur, stance_dur], axis=1
         )
         return new_velfilt_df
 
@@ -239,37 +276,49 @@ def get_stance_dist2(leg_steps_velfilt, data, leg, BL=1):
         if leg == "R3":
             Leg_TaG = data.iloc[:, R3_TaG_idx]
 
-        TD_pos_df = pd.DataFrame()
-        LO_pos_df = pd.DataFrame()
-        Stance_dist = []
-        # Stance_dir = []
+        stance_dist = []
 
-        TD_arr = leg_steps_velfilt["TD"]
-        LO_arr = leg_steps_velfilt["LO"]
-        for step in range(len(leg_steps_velfilt)):
-            TD_pos_step = pd.DataFrame(Leg_TaG.iloc[int(TD_arr[step]), :]).T
-            LO_pos_step = pd.DataFrame(Leg_TaG.iloc[int(LO_arr[step]), :]).T
-            stance_dist_step = math.dist(TD_pos_step.iloc[0, :], LO_pos_step.iloc[0, :])
+        if leg_steps_velfilt.columns[0] == "TD":  ## if first event is stance
+            if len(leg_steps_velfilt.dropna()) > 0:
+                for step in range(len(leg_steps_velfilt.dropna())):
+                    TD_pos_step = pd.DataFrame(
+                        Leg_TaG.iloc[int(leg_steps_velfilt["TD"][step]), :]
+                    ).T
+                    LO_pos_step = pd.DataFrame(
+                        Leg_TaG.iloc[int(leg_steps_velfilt["LO"][step]), :]
+                    ).T
+                    stance_dist_step = math.dist(
+                        TD_pos_step.iloc[0, :], LO_pos_step.iloc[0, :]
+                    )
+                    stance_dist.append(stance_dist_step)
+            else:
+                stance_dist.append(np.nan)
 
-            # direction_step = get_stepping_direction(
-            #     Ref_vector, TD_pos_step, LO_pos_step
-            # )
+        elif leg_steps_velfilt.columns[0] == "LO":  ## if first event is swing
+            if len(leg_steps_velfilt) > 1:  ## if there are at least 2 lift offs
+                for step in range(len(leg_steps_velfilt) - 1):
+                    TD_pos_step = pd.DataFrame(
+                        Leg_TaG.iloc[int(leg_steps_velfilt["TD"][step]), :]
+                    ).T
+                    LO_pos_step = pd.DataFrame(
+                        Leg_TaG.iloc[int(leg_steps_velfilt["LO"][step + 1]), :]
+                    ).T
 
-            Stance_dist.append(stance_dist_step)
-            # Stance_dir.append(direction_step)
-        #     TD_pos_df = pd.concat([TD_pos_df, TD_pos_step.reset_index(drop=True)], axis=0).reset_index(drop=True)
-        #     LO_pos_df = pd.concat([LO_pos_df, LO_pos_step.reset_index(drop=True)], axis=0).reset_index(drop=True)
+                    stance_dist_step = math.dist(
+                        TD_pos_step.iloc[0, :], LO_pos_step.iloc[0, :]
+                    )
+                    stance_dist.append(stance_dist_step)
+            else:
+                stance_dist.append(np.nan)
 
-        # TD_pos_df.columns = ['TD_TaG_x', 'TD_TaG_y','TD_TaG_z']
-        # LO_pos_df.columns = ['LO_TaG_x', 'LO_TaG_y','LO_TaG_z']
-        Stance_dist_norm = pd.DataFrame([elem / BL for elem in Stance_dist])
-        Stance_dist_norm.columns = ["stance_dist_norm"]
+        else:
+            raise TypeError("Unexpected input to function")
 
-        # Stance_dir = pd.DataFrame(Stance_dir)
-        # Stance_dir.columns = ["stance_dir"]
+        # print((leg_steps_velfilt.columns[0], len(leg_steps_velfilt), stance_dist))
+        stance_dist_norm = pd.DataFrame([elem / BL for elem in stance_dist])
+        # stance_dist_norm.columns = ["stance_dist_norm"]
 
-        # Leg_all_data = pd.concat([leg_steps_velfilt, Stance_dist_norm, TD_pos_df, LO_pos_df], axis = 1)
-        Leg_all_data = pd.concat([leg_steps_velfilt, Stance_dist_norm], axis=1)
+        Leg_all_data = pd.concat([leg_steps_velfilt, stance_dist_norm], axis=1)
         Leg_all_data = Leg_all_data.iloc[
             :, 2:
         ]  # dropping TD, LO columns in the beginning
@@ -394,7 +443,10 @@ def smoothed_table(genotype, window):
                 .get_group(t)
                 .reset_index(drop=True)
             )
-            data_stim = data.iloc[400:1000, :].reset_index(drop=True)
+            # data_stim = data.iloc[400:1000, :]
+            data_stim = data.iloc[:1000, :]
+
+            # data_stim = data.reset_index(drop=True)
 
             # Defining body length as distance between wing hinges
             BL = math.dist(
@@ -413,10 +465,11 @@ def smoothed_table(genotype, window):
             # Heading_vector = get_heading_direction_vector(data)
 
             for i in range(len(data_stim) - window):
-                temp_win = data_stim.iloc[i : i + window, :].reset_index(drop=True)
+                temp_win = data_stim.iloc[i : i + window, :]
+                idx_ts = temp_win.index[0]
 
-                mean_z_vel = np.mean(abs(temp_win["z_vel"]))
-                mean_y_vel = np.mean(abs(temp_win["y_vel"]))
+                mean_z_vel = np.mean((temp_win["z_vel"]))
+                mean_y_vel = np.mean((temp_win["y_vel"]))
                 mean_x_vel = np.mean(temp_win["x_vel"])
                 vel_df = pd.DataFrame([fly, t, mean_x_vel, mean_y_vel, mean_z_vel]).T
                 vel_df.columns = [
@@ -428,37 +481,37 @@ def smoothed_table(genotype, window):
                 ]
 
                 L1_stepdata = get_stance_dist2(
-                    get_temp_params_2(align_arr(get_TD_LO(temp_win, "L1"))),
+                    get_temp_params_2(align_arr(get_TD_LO(temp_win, "L1", idx_ts))),
                     data,
                     "L1",
                     BL,
                 )
                 L2_stepdata = get_stance_dist2(
-                    get_temp_params_2(align_arr(get_TD_LO(temp_win, "L2"))),
+                    get_temp_params_2(align_arr(get_TD_LO(temp_win, "L2", idx_ts))),
                     data,
                     "L2",
                     BL,
                 )
                 L3_stepdata = get_stance_dist2(
-                    get_temp_params_2(align_arr(get_TD_LO(temp_win, "L3"))),
+                    get_temp_params_2(align_arr(get_TD_LO(temp_win, "L3", idx_ts))),
                     data,
                     "L3",
                     BL,
                 )
                 R1_stepdata = get_stance_dist2(
-                    get_temp_params_2(align_arr(get_TD_LO(temp_win, "R1"))),
+                    get_temp_params_2(align_arr(get_TD_LO(temp_win, "R1", idx_ts))),
                     data,
                     "R1",
                     BL,
                 )
                 R2_stepdata = get_stance_dist2(
-                    get_temp_params_2(align_arr(get_TD_LO(temp_win, "R2"))),
+                    get_temp_params_2(align_arr(get_TD_LO(temp_win, "R2", idx_ts))),
                     data,
                     "R2",
                     BL,
                 )
                 R3_stepdata = get_stance_dist2(
-                    get_temp_params_2(align_arr(get_TD_LO(temp_win, "R3"))),
+                    get_temp_params_2(align_arr(get_TD_LO(temp_win, "R3", idx_ts))),
                     data,
                     "R3",
                     BL,
@@ -499,6 +552,11 @@ def smoothed_table(genotype, window):
                 temp_win_data = pd.concat(
                     [vel_df, pd.DataFrame(temp_win_data).T], axis=1
                 )
+
+                ## replacing NaNs by zeros
+                ## for V1 replacing anythiung that is an Nan by zero. Future version to use more sensible values
+                for col in temp_win_data.columns:
+                    temp_win_data[col] = temp_win_data[col].fillna(0)
 
                 DataSt = pd.concat([DataSt, temp_win_data], axis=0, ignore_index=True)
     return DataSt
