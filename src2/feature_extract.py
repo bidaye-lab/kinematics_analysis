@@ -411,7 +411,31 @@ def check_if_empty(stepdata_df, leg):
         return stepdata_df
 
 
-def smoothed_table(genotype, window):
+def gaussian_weights(window_size, sigma):
+    """
+    Generates Gaussian weights centered around the middle of the window_size.
+
+    Parameters:
+    - window_size (int): Size of the moving window.
+    - sigma (float): Standard deviation of the Gaussian distribution.
+
+    Returns:
+    - weights (ndarray): 1D array of Gaussian weights.
+    """
+    positions = np.arange(window_size)
+    weights = np.exp(-((positions - window_size // 2) ** 2) / (2 * sigma**2))
+    weights /= np.sum(weights)  # Normalize weights to sum to 1
+    return weights
+
+
+def get_gaussian_mean(arr, weights_temp):
+
+    temp_mean = np.average(arr, weights=weights_temp)
+
+    return temp_mean
+
+
+def smoothed_table(genotype, window, sigma=1):
     """Constructs a DataFrame with stepping parameters (step cycle based and joint angle based),
     averaged over a moving window of the chisen size (in frames, 1 frame = 5ms)
 
@@ -430,6 +454,7 @@ def smoothed_table(genotype, window):
     """
     window = int(window)
     DataSt = pd.DataFrame()
+    weights_norm = gaussian_weights(window, sigma)
 
     flies = genotype["flynum"].unique()
     for fly in flies:
@@ -443,10 +468,10 @@ def smoothed_table(genotype, window):
                 .get_group(t)
                 .reset_index(drop=True)
             )
-            # data_stim = data.iloc[400:1000, :]
-            data_stim = data.iloc[:1000, :]
 
-            # data_stim = data.reset_index(drop=True)
+            data_stim = data.iloc[
+                int(window / 2) : 1400, :
+            ]  ## change to include only stim frames or just pre-stim period
 
             # Defining body length as distance between wing hinges
             BL = math.dist(
@@ -462,15 +487,22 @@ def smoothed_table(genotype, window):
                 ],
             )
 
-            # Heading_vector = get_heading_direction_vector(data)
-
-            for i in range(len(data_stim) - window):
+            for i in range(
+                len(data_stim) - window
+            ):  ## total length = 1400 - (window*1.5)
                 temp_win = data_stim.iloc[i : i + window, :]
                 idx_ts = temp_win.index[0]
 
-                mean_z_vel = np.mean((temp_win["z_vel"]))
-                mean_y_vel = np.mean((temp_win["y_vel"]))
-                mean_x_vel = np.mean(temp_win["x_vel"])
+                mean_z_vel = get_gaussian_mean(
+                    temp_win["z_vel"], weights_norm
+                )  # np.mean((temp_win["z_vel"]))
+                mean_y_vel = get_gaussian_mean(
+                    temp_win["y_vel"], weights_norm
+                )  # np.mean((temp_win["y_vel"]))
+                mean_x_vel = get_gaussian_mean(
+                    temp_win["x_vel"], weights_norm
+                )  # np.mean(temp_win["x_vel"])
+
                 vel_df = pd.DataFrame([fly, t, mean_x_vel, mean_y_vel, mean_z_vel]).T
                 vel_df.columns = [
                     "flynum",
