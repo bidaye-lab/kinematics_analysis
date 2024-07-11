@@ -435,7 +435,7 @@ def get_gaussian_mean(arr, weights_temp):
     return temp_mean
 
 
-def smoothed_table(genotype, window, sigma=1):
+def smoothed_table(genotype, window, sigma=1, end_frame=1400):
     """Constructs a DataFrame with stepping parameters (step cycle based and joint angle based),
     averaged over a moving window of the chisen size (in frames, 1 frame = 5ms)
 
@@ -445,7 +445,10 @@ def smoothed_table(genotype, window, sigma=1):
         original datastructure with 3d pose, 3d angles, ball velocity and step cycle predictions
     window : int
         moving avergae bin size in frames (1 frame = 5ms)
-
+    sigma: int, optional (default = 1)
+        std deviation of the gaussian kernel used for smoothing velocity
+    end_frame : int, optional (default = 1400)
+        last time point in the tial to be considered; defaults to considering whole trial
     Returns
     -------
     DataFrame
@@ -470,8 +473,8 @@ def smoothed_table(genotype, window, sigma=1):
             )
 
             data_stim = data.iloc[
-                int(window / 2) : 1400, :
-            ]  ## change to include only stim frames or just pre-stim period
+                :end_frame, :
+            ]  ## change to include only stim frames or just pre-stim period #int(window / 2)
 
             # Defining body length as distance between wing hinges
             BL = math.dist(
@@ -489,8 +492,9 @@ def smoothed_table(genotype, window, sigma=1):
 
             for i in range(
                 len(data_stim) - window
-            ):  ## total length = 1400 - (window*1.5)
+            ):  ## total length = end_frame - (window*1.5)
                 temp_win = data_stim.iloc[i : i + window, :]
+
                 idx_ts = temp_win.index[0]
 
                 mean_z_vel = get_gaussian_mean(
